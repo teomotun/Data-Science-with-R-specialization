@@ -10,7 +10,7 @@ if(!file.exists(dataFiles.zip)) {
 }
 unzip(zipfile = "dataFiles.zip")
 power_consumption <- read.table(file = "household_power_consumption.txt", dec = ".", stringsAsFactors = FALSE, 
-                                    colClasses = c("character", "character", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric"), header = TRUE, sep = ";", na.strings = "?")
+                                colClasses = c("character", "character", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric"), header = TRUE, sep = ";", na.strings = "?")
 
 # subset data to and remove original data table to free space
 data <- filter(power_consumption, Date %in% c("1/2/2007", "2/2/2007"))
