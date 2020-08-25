@@ -27,7 +27,7 @@ total_steps <- summarize(group_by(activity, date), steps = sum(steps, na.rm = TR
 hist(total_steps$steps, col = "red", main = "Total Steps Per Day", xlab = "Number of Steps")
 ```
 
-!(PA1_template_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+![](PA1_template_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
 The mean total number of steps per day is 9354.23.
 
