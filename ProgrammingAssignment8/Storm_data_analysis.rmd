@@ -1,0 +1,240 @@
+---
+title: "Exploration of NOAA Storm Data"
+author: Tolu Omotunde
+date: 26/Aug/2020
+output: html_document
+highlighter : highlight.js  # {highlight.js, prettify, highlight}
+hitheme     : tomorrow 
+widgets     : [mathjax]            # {mathjax, quiz, bootstrap}
+mode        : selfcontained # {standalone, draft}
+---
+
+## Load libraries and prepare R environment
+```{r message=FALSE, warning=FALSE}
+rm(list=ls())
+library(plyr)
+library(dplyr)
+library(ggplot2)
+```
+## Data
+The data for this assignment come in the form of a comma-separated-value file compressed via the bzip2 algorithm to reduce its size. You can download the file from the course web site:
+
+storm data[47Mb]
+
+There is also some documentation of the database available. Here you will find how some of the variables are constructed/defined.
+ * National Weather Service Storm Data Documentation
+ * National Climatic Data Center Storm Events FAQ
+
+The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+## Assignment
+The basic goal of this assignment is to explore the NOAA Storm Database and answer the following basic questions about severe weather events.
+
+  * Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+  * Across the United States, which types of events have the greatest economic consequences?
+
+## Data Processing
+### Loading storm data to be used
+The data was downloaded from the link above and saved on local computer (in setwd command one can replace loacal file path with path of folder where the data was downloaded). Then it was loaded on the R using the read.csv command. If object strom.data is already loaded, use that cached object insted of loading it each time the Rmd file is knitted.
+```{r message=FALSE, warning=FALSE, cache=TRUE}
+if(!file.exists("storm.data")) {
+    storm.data<-read.csv(bzfile("repdata_data_StormData.csv.bz2"),header = TRUE)
+}
+
+```
+
+
+### Examine dataset
+```{r}
+dim(storm.data)
+```
+
+### Examine the structure of the data
+```{r}
+str(storm.data)
+```
+
+
+### Extracting variables of interest for analysis of weather impact on health and economy
+From a list of variables in storm.data, these are columns of interest:
+
+Health variables:
+* FATALITIES: approx. number of deaths
+* INJURIES: approx. number of injuries
+
+Economic variables:
+
+* PROPDMG: approx. property damags
+* PROPDMGEXP: the units for property damage value
+* CROPDMG: approx. crop damages
+* CROPDMGEXP: the units for crop damage value
+Events - target variable:
+
+* EVTYPE: weather event (Tornados, Wind, Snow, Flood, etc..)
+Extract variables of interest from original data set:
+```{r}
+vars <- c( "EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
+mydata <- storm.data[, vars]
+```
+
+Check the last few rows in data set (in firs years of recording there are many missing (NA) values):
+```{r}
+tail(mydata)
+
+```
+### Checking for missing values
+In every analysis we must the check number of missing values in variables.
+
+Check for missing values in selected columns of the data.
+```{r}
+c(sum(is.na(mydata$FATALITIES)),sum(is.na(mydata$INJURIES)), sum(is.na(mydata$PROPDMG)), sum(is.na(mydata$CROPDMG)), sum(is.na(mydata$PROPDMGEXP)), sum(is.na(mydata$CROPDMGEXP)))
+```
+
+### Transforming extracted variables
+Listing the first 10 event types that most appear in the data
+```{r}
+sort(table(mydata$EVTYPE), decreasing = TRUE)[1:10]
+```
+We will group events like TUNDERSTORM WIND, TUNDERSTORM WINDS, HIGH WIND, etc. by containing the keyword ‘WIND’ as one event WIND. And we will transform other types of events in a similar way. New variable EVENTS is the transform variable of EVTYPE that have 10 different types of events: HEAT, FLOOD, etc., and type OTHER for events in which name the keyword is not found.
+```{r}
+# create a new variable EVENT to transform variable EVTYPE in groups
+mydata$EVENT <- "OTHER"
+# group by keyword in EVTYPE
+mydata$EVENT[grep("HAIL", mydata$EVTYPE, ignore.case = TRUE)] <- "HAIL"
+mydata$EVENT[grep("HEAT", mydata$EVTYPE, ignore.case = TRUE)] <- "HEAT"
+mydata$EVENT[grep("FLOOD", mydata$EVTYPE, ignore.case = TRUE)] <- "FLOOD"
+mydata$EVENT[grep("WIND", mydata$EVTYPE, ignore.case = TRUE)] <- "WIND"
+mydata$EVENT[grep("STORM", mydata$EVTYPE, ignore.case = TRUE)] <- "STORM"
+mydata$EVENT[grep("SNOW", mydata$EVTYPE, ignore.case = TRUE)] <- "SNOW"
+mydata$EVENT[grep("TORNADO", mydata$EVTYPE, ignore.case = TRUE)] <- "TORNADO"
+mydata$EVENT[grep("WINTER", mydata$EVTYPE, ignore.case = TRUE)] <- "WINTER"
+mydata$EVENT[grep("RAIN", mydata$EVTYPE, ignore.case = TRUE)] <- "RAIN"
+# listing the transformed event types 
+sort(table(mydata$EVENT), decreasing = TRUE)
+```
+
+Checking the values for variables that represent units od dollars:
+```{r}
+sort(table(mydata$PROPDMGEXP), decreasing = TRUE)[1:10]
+```
+
+```{r}
+sort(table(mydata$CROPDMGEXP), decreasing = TRUE)[1:10]
+```
+
+There is some mess in units, so we transform those variables in one unit (dollar) variable by the following rule:
+* K or k: thousand dollars (10^3)
+* M or m: million dollars (10^6)
+* B or b: billion dollars (10^9)
+* the rest would be consider as dollars
+
+New variable(s) is product of value of damage and dollar unit.
+```{r}
+mydata$PROPDMGEXP <- as.character(mydata$PROPDMGEXP)
+mydata$PROPDMGEXP[is.na(mydata$PROPDMGEXP)] <- 0 # NA's considered as dollars
+mydata$PROPDMGEXP[!grepl("K|M|B", mydata$PROPDMGEXP, ignore.case = TRUE)] <- 0 # everything exept K,M,B is dollar
+mydata$PROPDMGEXP[grep("K", mydata$PROPDMGEXP, ignore.case = TRUE)] <- "3"
+mydata$PROPDMGEXP[grep("M", mydata$PROPDMGEXP, ignore.case = TRUE)] <- "6"
+mydata$PROPDMGEXP[grep("B", mydata$PROPDMGEXP, ignore.case = TRUE)] <- "9"
+mydata$PROPDMGEXP <- as.numeric(as.character(mydata$PROPDMGEXP))
+mydata$property.damage <- mydata$PROPDMG * 10^mydata$PROPDMGEXP
+
+mydata$CROPDMGEXP <- as.character(mydata$CROPDMGEXP)
+mydata$CROPDMGEXP[is.na(mydata$CROPDMGEXP)] <- 0 # NA's considered as dollars
+mydata$CROPDMGEXP[!grepl("K|M|B", mydata$CROPDMGEXP, ignore.case = TRUE)] <- 0 # everything exept K,M,B is dollar
+mydata$CROPDMGEXP[grep("K", mydata$CROPDMGEXP, ignore.case = TRUE)] <- "3"
+mydata$CROPDMGEXP[grep("M", mydata$CROPDMGEXP, ignore.case = TRUE)] <- "6"
+mydata$CROPDMGEXP[grep("B", mydata$CROPDMGEXP, ignore.case = TRUE)] <- "9"
+mydata$CROPDMGEXP <- as.numeric(as.character(mydata$CROPDMGEXP))
+mydata$crop.damage <- mydata$CROPDMG * 10^mydata$CROPDMGEXP
+```
+
+Print of first 10 values for property damage (in dollars) that most appear in the data:
+```{r}
+sort(table(mydata$property.damage), decreasing = TRUE)[1:10]
+```
+Print of first 10 values for crop damage (in dollars) that most appear in the data:
+```{r}
+sort(table(mydata$crop.damage), decreasing = TRUE)[1:10]
+```
+
+## Analysis
+### Aggregating events for public health variables
+Table of public health problems by event type
+```{r}
+agg.fatalities.and.injuries <- summarize(group_by(mydata, EVENT), Total = sum(FATALITIES + INJURIES, na.rm = TRUE))
+agg.fatalities.and.injuries$type <- "fatalities and injuries"
+
+# aggregate FATALITIES by type of EVENT
+agg.fatalities <- summarize(group_by(mydata, EVENT), Total = sum(FATALITIES, na.rm = TRUE))
+agg.fatalities$type <- "fatalities"
+
+# aggregate INJURIES by type of EVENT
+agg.injuries <- summarize(group_by(mydata, EVENT), Total = sum(INJURIES, na.rm = TRUE))
+agg.injuries$type <- "injuries"
+
+# combine all
+agg.health <- rbind(agg.fatalities, agg.injuries)
+
+health.by.event <- join(agg.fatalities, agg.injuries, by="EVENT", type="inner")
+health.by.event
+```
+
+### Aggregating events for economic variables
+```{r}
+# aggregate PropDamage and CropDamage by type of EVENT
+agg.propdmg.and.cropdmg <- summarize(group_by(mydata, EVENT), Total = sum(property.damage + crop.damage, na.rm = TRUE))
+agg.propdmg.and.cropdmg$type <- "property and crop damage"
+
+# aggregate PropDamage by type of EVENT
+agg.prop <- summarize(group_by(mydata, EVENT), Total = sum(property.damage, na.rm = TRUE))
+agg.prop$type <- "property"
+
+# aggregate INJURIES by type of EVENT
+agg.crop <- summarize(group_by(mydata, EVENT), Total = sum(crop.damage + crop.damage, na.rm = TRUE))
+agg.crop$type <- "crop"
+
+# combine all
+agg.economic <- rbind(agg.prop, agg.crop)
+
+
+economic.by.event <- join (agg.prop, agg.crop, by="EVENT", type="inner")
+economic.by.event
+
+```
+
+## Results
+### Across the United States, which types of events are most harmful with respect to population health?
+```{r}
+# transform EVENT to factor variable for health variables
+agg.health$EVENT <- as.factor(agg.health$EVENT)
+
+# plot FATALITIES and INJURIES by EVENT
+health.plot <- ggplot(agg.health, aes(x = EVENT, y = Total, fill = type)) + geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Event Type") + 
+  ylab("Total number of health impact") +
+  ggtitle("Weather event types impact on public health") +
+  theme(plot.title = element_text(hjust = 0.5))
+print(health.plot)
+```
+
+The most harmful weather event for health (in number of total fatalites and injuries) is, by far, a tornado.
+
+### Across the United States, which types of events have the greatest economic consequences?
+```{r}
+# # transform EVENT to factor variable for economic variables
+agg.economic$EVENT <- as.factor(agg.economic$EVENT)
+
+# plot PROPERTY damage and CROP damage by EVENT
+economic.plot <- ggplot(agg.economic, aes(x = EVENT, y = Total, fill = type)) + geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Event Type") + 
+  ylab("Total damage in dollars") +
+  ggtitle("Weather event types impact on property and crop damage") +
+  theme(plot.title = element_text(hjust = 0.5))
+print(economic.plot) 
+```
+
+The most devastating weather event with the greatest economic cosequences (to property and crops) is a flood.
+
