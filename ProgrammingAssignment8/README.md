@@ -1,5 +1,6 @@
 # Exploration of NOAA Storm Data
-
+## Find published project here:
+    [https://rpubs.com/teomotun/656977]
 ### Data
 The data for this assignment come in the form of a comma-separated-value file compressed via the bzip2 algorithm to reduce its size. You can download the file from the course web site:
 
