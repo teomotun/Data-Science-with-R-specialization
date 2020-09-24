@@ -135,5 +135,5 @@ business_diff[order(business_diff[,4])[1:5],]
 Clearly the 4 majors we pointed out above have lower p-value, and the fifth one (Arts) starts to have high enough p-value of 0.31.
 ## Save analysis
 ```{r}
-dance_save("~/Desktop/college_major_analysis.rds")
+dance_save("college_major_analysis.rds")
 ```
