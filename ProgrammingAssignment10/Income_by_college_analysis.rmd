@@ -1,0 +1,139 @@
+---
+title: "Is there an association between college major category and income"
+author: Tolu Omotunde
+date: 24/Sep/2020
+output: html_document
+highlighter : highlight.js  # {highlight.js, prettify, highlight}
+hitheme     : tomorrow 
+widgets     : [mathjax]            # {mathjax, quiz, bootstrap}
+mode        : selfcontained # {standalone, draft}
+---
+
+## Load a new dataframe called college in R environment
+```{r message=FALSE, warning=FALSE}
+#install.packages("devtools")
+devtools::install_github("jhudsl/collegeIncome")
+library(reshape)
+library(ggplot2)
+library(collegeIncome)
+data(college)
+```
+## Next download and install the matahari R package, this package allows a record of your analysis (your R command history) to be documented
+```{r}
+devtools::install_github("jhudsl/matahari")
+library(matahari)
+```
+## Begin the documentation of analysis
+```{r}
+dance_start(value = FALSE, contents = FALSE)
+```
+
+```{r}
+head(college)
+```
+
+```{r}
+tail(college)
+```
+
+```{r}
+str(college)
+```
+We can see that the data has 173 observations of 19 variables which corresponds to the codebook.
+The question asks about relationship between the major category and income, so I will only look at major_category and median. There are obviously other factors that may affect our analysis, for example: gender perc_men and perc_women, sample size (number of objects that provide income) perc_employed and total… I assume to omit all other variables.
+
+Now let’s factorize the data and see the relationship between our two interested values:
+## Remove nulls and convert char to factor
+```{r}
+college <- na.omit(college)
+college$rank <- as.factor(college$rank)
+college$major <- as.factor(college$major)
+college$major_code <- as.factor(college$major_code)
+college$major_category <- as.factor(college$major_category)
+## Subset numeric column
+#college.numeric <- college[,sapply(college, is.numeric)]
+```
+
+```{r}
+boxplot(median/1000 ~ major_category, data = college, main = "Income vs. Major", ylab="Income (thousands of dollar)", las = 2)
+```
+We can see the distribution of the median of Income of each major is not normal, they’re skewed. However for the purpose of this project of practicing linear model, I assume they’re normal.
+
+Analysis
+Let’s have a look at the major_category:
+
+```{r}
+unique(college$major_category)
+```
+
+When we apply a linear model to this data, linking Income to all Majors, the default output intercept is the mean of the referenced major (alphabet sorted, with Agriculture first), the gradient coefficient of other majors is the difference of the mean of that major to the referenced one, and the p-value of those coefficients is the probability of a t-test if that mean and the referenced mean is different. For example, say we want to compare major Arts with others:
+```{r}
+major_category_ref <- relevel(college$major_category, "Arts")
+fit <- lm(median ~ major_category_ref, data = college)
+summary(fit)$coef
+```
+From this result we can get some information:
+- mean of median of Income from major Arts is 38,050
+- difference of mean of median of Income of Agriculture & Natural Resources from Arts is 5,450, and p-value of this difference is 0.31, which implies that the difference is not significant
+- the same interpretation can be done for coefficients of other variables
+
+For this project, we ideally run linear regression models of income (median) vs. college major (major_catecory) for all majors as referenced. Given a referenced level, the model coefficients will indicate the difference of the mean of other variables and the probability if they are the same.
+I will run regression model for each major as the reference. The similar probabilities are stored in a 2D matrix A
+```{r}
+A <- matrix(, nrow = 16, ncol = 16)
+
+for (i in 1:16){
+    major_category_ref <- relevel(college$major_category, as.character(unique(college$major_category)[i]))
+    fit <- lm(median ~ major_category_ref, data = college)
+    tmp <- summary(fit)$coef[,4]
+    # swap the first element to the corresponding position in the diagonal matrix
+    tmp1 <- tmp[1:i]
+    tmp1 <- c(0,tmp1)
+    tmp1 <- c(tmp1[-2],tmp1[2])
+    tmp1 <- tmp1[-1]
+    # save to A
+    A[,i] <- c(tmp1,tmp[-(1:i)])
+}
+```
+Edit the matrix and plot.
+```{r}
+B <- data.frame(A)
+names(B) <- unique(college$major_category)
+B$major <- unique(college$major_category)
+Bmelt <- melt(B)
+```
+```{r}
+g = ggplot(data=Bmelt, aes(x=variable, y=major, fill=value))
+g = g + geom_tile()
+g = g + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ylab("Major") + xlab("Major")
+g = g + ggtitle("Probability of difference in Income between Majors")
+g = g + coord_fixed()
+g
+```
+Assuming a confidence interval of 95%, I mark all probabilities smaller than 2.5% as Different and larger than or equal to 2.5% as Same.
+
+```{r}
+g = ggplot(data=Bmelt, aes(x=variable, y=major, fill=value < 0.025))
+g = g + geom_tile()
+g = g + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ylab("Major") + xlab("Major")
+g = g + ggtitle("Difference in Income between Majors")
+g = g + coord_fixed()
+g
+```
+Apparently, most majors have similar income, except the Business. Its income is significant different from Computers & Mathematics, Education, Engineering, and Humanities & Liberal Arts.
+Let’s try calculating how different they are from the Business:
+```{r}
+major_category_ref <- relevel(college$major_category, "Business")
+fit <- lm(median ~ major_category_ref, data = college)
+summary(fit)$coef
+```
+and look at the lowest 5 majors
+```{r}
+business_diff <- summary(fit)$coef[-1,]
+business_diff[order(business_diff[,4])[1:5],]
+```
+Clearly the 4 majors we pointed out above have lower p-value, and the fifth one (Arts) starts to have high enough p-value of 0.31.
+## Save analysis
+```{r}
+dance_save("~/Desktop/college_major_analysis.rds")
+```
