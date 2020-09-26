@@ -1,0 +1,21 @@
+---
+title: "Intro to spatial analysis tutorial"
+author: Tolu Omotunde
+date: 09/23/2020
+output: html_document
+highlighter : highlight.js  # {highlight.js, prettify, highlight}
+hitheme     : tomorrow 
+widgets     : [mathjax]            # {mathjax, quiz, bootstrap}
+mode        : selfcontained # {standalone, draft}
+---
+
+## Load and install packages
+```{r message=FALSE, warning=FALSE}
+setwd("/Users/toluwalasheomotunde/Desktop/DataScienceWithR/CC-spatial-master")
+library(sp)
+library(ggplot2)
+library(viridis)
+library(rasterVis)
+library(raster)
+library(rgdal)
+```

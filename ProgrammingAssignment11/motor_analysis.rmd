@@ -1,0 +1,114 @@
+---
+title: 'Motor Trend magazine: Automatic or manual transmission?'
+author: "Tolu Omotunde"
+date: "26/Sep/2020"
+output:
+  pdf_document: default
+  html_document: default
+mode: selfcontained
+hitheme: tomorrow
+highlighter: highlight.js
+widgets: mathjax
+---
+
+
+You work for Motor Trend, a magazine about the automobile industry. Looking at a data set of a collection of cars, they are interested in exploring the relationship between a set of variables and miles per gallon (MPG) (outcome). They are particularly interested in the following two questions:
+
+“Is an automatic or manual transmission better for MPG”
+“Quantify the MPG difference between automatic and manual transmissions”
+
+## Preprocessing
+```{r message=FALSE, warning=FALSE}
+data(mtcars)
+names(mtcars)
+```
+
+```{r message=FALSE, warning=FALSE}
+summary(cars)
+```
+
+## 1. Analysis
+As we can see, there are 11 variables in the dataset. We are interested in the relationship between mpg and other variables, so first we check the correlation between mpg and other variables by using the cor() function.
+
+```{r message=FALSE, warning=FALSE}
+cor(mtcars$mpg,mtcars[,-1])
+```
+From the correlation results, we can see, that the cyl, hp, wt and carb are negatively correlated with mpg.
+
+## 2. Automatic or manual transmission?
+Checking at the help of the dataset (?mtcars), we can identify the transmission type as:
+* 0 = automatic
+* 1 = manual
+We need to make some data conversions.
+```{r message=FALSE, warning=FALSE}
+mtcars$am <- as.factor(mtcars$am)
+levels(mtcars$am) <-c("Automatic", "Manual")
+```
+
+A boxplot can be seen in the appendix, with the relationship between mpg and am type (Appendix 1). It seems like automatic car has better mpg compared with manual cars.
+
+We perform a statistical analysis to support this hypothesis with a t-test.
+
+```{r message=FALSE, warning=FALSE}
+t.test(mtcars$mpg~mtcars$am,conf.level=0.95)
+```
+The p-value is 0.001374, we may reject the null hypothesis and conclude, that automatic transmission cars have lower mpg compared with manual transmission cars - but this assumption is based on all other characteristics of automatic transmission cars and manual transmission cars are same (e.g: both have same weight distribution). This needs to be further explored in a multiple linear regression analysis.
+
+## 3. Quantifying mpg difference
+Here we can adopt a stepwise algorithm, to choose the best model. We are using the step() function.
+```{r message=FALSE, warning=FALSE}
+stepmodel = step(lm(data = mtcars, mpg ~ .),trace=0,steps=10000)
+summary(stepmodel)
+```
+At this point we have a model, which includes 3 variables
+* wt
+* qsec
+* am
+This model has a 0.85 of total variance. To further optimize the model, we can examine mpg ~ wt + qsec correlation with am.
+
+```{r message=FALSE, warning=FALSE}
+model <- lm(mpg~ factor(am):wt + factor(am):qsec,data=mtcars)
+summary(model)
+```
+
+## 4. Summary
+Interpreting the results, we can see this model has a 89.5% total variance with an adjusted variance of 0.879. By adding the coefficients, we have the following conclusions:
+
+* when the weight increased by 1000 lbs, the mpg decreased by -3.176 for automatic transmission cars, and -6.09 for manual transmission cars
+* so with increasing car weight we should choose manual transmission cars
+* when the acceleration speed dropped, and 1/4 mile time increased (by 1 sec), the mpg factor increased by 0.834 miles for automatic transmission cars, and 1.446 miles for manual transmission cars
+* so with lower acceleration speed, but same weight, manual transmission cars are better for mpg
+
+## Main conclusion
+The mpg is largely determined by the interplay between weight, acceleration and transmission. Given the above analysis, the original question (automatic transmission vs manual transmission) is not really answered, and should be considered in the context of weight and acceleration speed.
+
+## Appendix
+## Appendix 1. Boxplot of mpg vs transmission type
+```{r message=FALSE, warning=FALSE}
+boxplot(mtcars$mpg ~ mtcars$am, data = mtcars, outpch = 19, ylab="mpg:miles per 
+gallon",xlab="transmission type",main="mpg vs transmission type", col="blue")
+```
+
+# Appendix 2. Residual check and diagnostics plot
+```{r message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))    
+plot(model)
+```
+
+# Appendix 3. Further plots
+```{r message=FALSE, warning=FALSE}
+plot(model)
+```
+
+# Appendix 4. Scatterplots
+```{r message=FALSE, warning=FALSE}
+pairs(mpg ~ ., data = mtcars)
+```
+
+# Appendix 5. Density and histogram
+```{r message=FALSE, warning=FALSE}
+par(mfrow=c(2,1))
+hist(mtcars$mpg, breaks=10, xlab="MPG", main="MPG histogram")
+plot(density(mtcars$mpg), main="kernel density", xlab="MPG")
+```
+
